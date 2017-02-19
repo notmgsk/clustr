@@ -1,0 +1,25 @@
+## probability density estimation in astronomy
+##
+## ** unfinished **
+##
+## paper describes three main estimators of the probability density function: kernel, adaptive kernel, parametriziong families of Johnson
+
+# histogram
+  - the histogram is the most widely used method to estimate a pdf
+  - f(x) = 1/Nh * (number of X_i in the same bin as x)
+  - obviously this depends on the choice of an origin and bin width, h, so the histogram can be a very biased estimator
+  - histogram is also discontinuous
+
+
+# kernel
+  - defined as Eqn. (1) in Vio
+  - (X_1, X_2, ... , X_n) is a sample drawn from some unknown distribution function f(x)
+  - so X_i are the sampled points we have and f(x) represents the underlying distribution of data
+  - the kernel density estimator constructs f(x) from the sum of `bumps' corresponding to single points of data
+  - the shape of the each bump is determined by K(x), the kernel function
+    	{so the kernel function says how much relevance a data point has at the point x and returns something corresponding to this decision at x}
+  - the exact functional form of K(x) has little impact; we generally choose it to be Gaussian for ease
+  - the window width h is another consideration, but this can be optimised
+  - it is more convenient to pass the data into the frequency spectrum using a DFT
+       ** why is this the case?**
+       	  - because the definition Eqn. (1) is a convolution ... need to look into this more
