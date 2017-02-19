@@ -11,7 +11,7 @@ nclust = 30
 field = np.zeros(shape=(N,N)) #generate the empty fields
 cluster = np.zeros(shape=(N,N))
 
-gal_pos = 500*np.random.random_sample((2,n)) #generate n pairs of random positions, which will define the galaxy positions
+gal_pos = N*np.random.random_sample((2,n)) #generate n pairs of random positions, which will define the galaxy positions
 
 lmean = 6 #mean radius 
 lsigma = 2 #standard deviation of radius
