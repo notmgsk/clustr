@@ -1,1 +1,10 @@
-wagwarn homes
+clustr - searching for galaxy clusters in DES
+
+There are numerous algorithms finding galaxy clusters in survey data, ranging
+from the very basic counting-in-cells to the advanced and modern Cluster Red
+Sequence method.
+
+This code is part of a student project (notmgsk & lconaboy @ UoN) to research and
+implement these algorithms, test them on the DES data, and finally produce a
+project report.
+
