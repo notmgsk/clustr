@@ -22,4 +22,5 @@
   - the window width h is another consideration, but this can be optimised
   - it is more convenient to pass the data into the frequency spectrum using a DFT
        ** why is this the case?**
-       	  - because the definition Eqn. (1) is a convolution ... need to look into this more
+       	  - because the definition Eqn. (1) is a convolution ... need
+	  to look into this more
