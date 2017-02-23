@@ -24,6 +24,7 @@ add_cluster(data, pos=[300, 300], scale=0.3, size=[20,20])
 add_cluster(data, pos=[100, 100], scale=0.5, size=[40, 40])
 
 def count_in_cells(data, width):
+    """Splits data up into width x width cell and then counts the data points within those cells. The shape of the return value is (data/width) x (data/width)."""
     #find galaxy clusters by determining the density of galaxies in
     #small cells and identifying overdensities
 
