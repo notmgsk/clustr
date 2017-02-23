@@ -5,17 +5,23 @@ xrange = 400
 yrange = xrange
 data = np.random.rand(xrange, yrange) > 0.99
 
-cluster_1_loc = [300, 300]
-cluster_1 = abs(np.random.normal(loc=0.0, scale=0.3, size=(20,20))) < 0.05
-cluster_2_loc = [100, 100]
-cluster_2 = abs(np.random.normal(loc=0.0, scale=0.5, size=(40,40))) < 0.05
+def insert_around(data, datum, loc):
+    drow = datum.shape[0]//2
+    dcol = datum.shape[1]//2
+    row = loc[0]
+    col = loc[1]
+    data[(row-drow):(row+drow), (col-dcol):(col+dcol)] = datum
 
-data[290:310, 290:310] = cluster_1
-data[80:120, 80:120] = cluster_2
+    return None
 
-# plt.figure('field')
-# plt.imshow(data, cmap='binary')
-# plt.grid()
+def add_cluster(data, pos, loc=0.0, scale=1.0, size=[20,20], sel=0.05):
+    clstr = abs(np.random.normal(loc=loc, scale=scale, size=size)) < sel
+    insert_around(data, clstr, pos)
+
+    return None
+
+add_cluster(data, pos=[300, 300], scale=0.3, size=[20,20])
+add_cluster(data, pos=[100, 100], scale=0.5, size=[40, 40])
 
 def count_in_cells(data, width):
     #find galaxy clusters by determining the density of galaxies in
