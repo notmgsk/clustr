@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
+import matplotlib.patches as patches
 
 xrange = 400
 yrange = xrange
