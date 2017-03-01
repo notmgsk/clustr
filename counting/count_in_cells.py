@@ -22,6 +22,18 @@ def add_cluster(data, pos, loc=0.0, scale=1.0, size=[20,20], sel=0.01):
 
     return None
 
+def find_clusters(data, cond):
+    """Returns the coordinates of overdensities (i.e. where cond is
+    satisfied)"""
+    # For now, data is expected to be data_normed. It might be more useful to
+    # have the input data be the galaxy field, and then this particular
+    # function would call count_in_cells, and return the relevent coordinates
+    # pointing into the galaxy field, rather than into the density map (i.e.
+    # data_normed). I say this would be more useful because, currently, after
+    # calling this function, we have to manually convert the coordinates from
+    # data_normed coords into galaxy field coords.
+    return np.argwhere(data > cond) 
+
 add_cluster(data, pos=[300, 300], scale=0.1, size=[20, 20])
 add_cluster(data, pos=[100, 100], scale=0.5, size=[40, 40])
 
