@@ -5,7 +5,7 @@ import matplotlib.patches as patches
 
 xrange = 400
 yrange = xrange
-data = np.random.rand(xrange, yrange) > 0.997
+data = np.random.rand(xrange, yrange) > 0.999
 
 def insert_around(data, datum, loc):
     drow = datum.shape[0]//2
@@ -22,7 +22,7 @@ def add_cluster(data, pos, loc=0.0, scale=1.0, size=[20,20], sel=0.01):
 
     return None
 
-add_cluster(data, pos=[300, 300], scale=0.3, size=[20, 20])
+add_cluster(data, pos=[300, 300], scale=0.1, size=[20, 20])
 add_cluster(data, pos=[100, 100], scale=0.5, size=[40, 40])
 
 def count_in_cells(data, width):
