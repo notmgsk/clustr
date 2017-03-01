@@ -82,9 +82,17 @@ sigma = np.std(data_summed)
 mu = np.mean(data_summed)
 data_normed = abs(data_summed - mu)/sigma
 
+clusters_normed = find_clusters(data_normed, 2)
+clusters_field = clusters_normed * width
+
 #defining the red rectangles that show where the clusters are located 
 clustr1 = patches.Rectangle((290, 290), 20, 20, edgecolor = 'r', facecolor = 'none')
 clustr2 = patches.Rectangle((80, 80), 40, 40, edgecolor = 'r', facecolor = 'none')
+
+cluster_patches = []
+for cluster in clusters_field:
+    cluster_patches.append(patches.Rectangle(cluster, width, width,
+                                             edgecolor='r', facecolor='none'))
 
 fig = plt.figure(figsize=(12,6))
 gs=gridspec.GridSpec(1,3, width_ratios=[4,4,0.2])
@@ -92,8 +100,8 @@ ax1 = plt.subplot(gs[0])
 ax2 = plt.subplot(gs[1])
 ax3 = plt.subplot(gs[2])
 ax1.imshow(data, cmap='binary')
-ax1.add_patch(clustr1)
-ax1.add_patch(clustr2)
+for cluster_patch in cluster_patches:
+    ax1.add_patch(cluster_patch)
 SC = ax2.imshow(data_normed)
 cax1 = plt.colorbar(SC, cax=ax3)
 cax1.set_label('$\sigma$', size = 20)
