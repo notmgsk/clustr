@@ -3,29 +3,21 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import matplotlib.patches as patches
 
-xrange = 400
-yrange = xrange
-data = np.random.rand(xrange, yrange) > 0.999
+def add_cluster(loc, scale, size):
+    global galaxy_data
 
-def insert_around(data, datum, loc):
-    drow = datum.shape[0]//2
-    dcol = datum.shape[1]//2
-    row = loc[0]
-    col = loc[1]
-    data[(row-drow):(row+drow), (col-dcol):(col+dcol)] = datum
+    x_cluster = np.random.normal(loc[0], scale, size)
+    y_cluster = np.random.normal(loc[1], scale, size)
 
-    return None
+    galaxy_data[0] = np.append(galaxy_data[0], x_cluster)
+    galaxy_data[1] = np.append(galaxy_data[1], y_cluster)
 
-def add_cluster(data, pos, loc=0.0, scale=1.0, size=[20,20], sel=0.01):
-    clstr = abs(np.random.normal(loc=loc, scale=scale, size=size)) < sel
-    insert_around(data, clstr, pos)
-
-    return None
+    return (loc, scale, size)
 
 def find_clusters(data, cond):
     """Returns the coordinates of overdensities (i.e. where cond is
     satisfied)"""
-    # For now, data is expected to be data_normed. It might be more useful to
+    # For now, data is expected to be data_normed. It might be more useful to,
     # have the input data be the galaxy field, and then this particular
     # function would call count_in_cells, and return the relevent coordinates
     # pointing into the galaxy field, rather than into the density map (i.e.
@@ -34,75 +26,56 @@ def find_clusters(data, cond):
     # data_normed coords into galaxy field coords.
     return np.argwhere(data > cond) 
 
-add_cluster(data, pos=[300, 300], scale=0.1, size=[20, 20])
-add_cluster(data, pos=[100, 100], scale=0.5, size=[40, 40])
+# Set up the galaxy field
+galaxy_width = 400
+N_field_gals = 30
+galaxy_data = [np.random.rand(N_field_gals) * galaxy_width,
+               np.random.rand(N_field_gals) * galaxy_width]
 
-def count_in_cells(data, width):
-    """Splits data up into width x width cell and then counts the data points within those cells. The shape of the return value is (data/width) x (data/width)."""
-    #find galaxy clusters by determining the density of galaxies in
-    #small cells and identifying overdensities
+add_cluster([200, 125], 10, 20)
+add_cluster([300, 300], 10, 15)
 
-    n_cells = int(xrange/width) #number of cells
-
-    data_summed = np.zeros(shape = (n_cells, n_cells))
-    
-    #loop over a grid and sum the data in each 'cell'
-    for i in range(0,n_cells-1):
-
-        for j in range(0, n_cells-1):
-
-            data_summed[i,j] = np.sum(data[i*width:(i+1)*width, j*width:(j+1)*width])
-    
-    return data_summed
-
-width = 40 #the width of each cell
-
-data_summed = count_in_cells(data,width)
-
-# # The picks out the average points per cell, to be used to cut out background
-# vmin = np.sum(data_summed)/(xrange/width)**2
-# # etc...
-# vmax = np.max(data_summed)
-
-# plt.figure(1)
-# plt.subplot(1, 2, 1)
-# plt.imshow(data, cmap='binary')
-# plt.subplot(1, 2, 2)
-# plt.imshow(data_summed, vmin=vmin, vmax=vmax)
-# plt.colorbar()
-# plt.grid()
-# plt.show()
-
-# subtract from each data point the mean of the distribution
-# divide this new data set by the standard deviation
-# this data set now tells us how mmany standard deviations larger than
-# the mean each point is
-
-sigma = np.std(data_summed)
-mu = np.mean(data_summed)
-data_normed = abs(data_summed - mu)/sigma
-
-clusters_normed = find_clusters(data_normed, 2)
-clusters_field = clusters_normed * width
-
-#defining the red rectangles that show where the clusters are located 
-clustr1 = patches.Rectangle((290, 290), 20, 20, edgecolor = 'r', facecolor = 'none')
-clustr2 = patches.Rectangle((80, 80), 40, 40, edgecolor = 'r', facecolor = 'none')
-
+# Histogram configuration
+N_bins = 15
+bin_width = galaxy_width // N_bins
+H, xedges, yedges = np.histogram2d(galaxy_data[0], galaxy_data[1], bins=N_bins)
+# xedges and yedges are the corners of the bins used by np.histogram2d. Useful for when we
+# need to convert from "bin" coordinates into "real" coordinates. 
+edges = np.array(list(zip(xedges, yedges)))
+# In order to give some significance to the clusters, we calculate the number of standard
+# deviations (i.e. z-value) away from the mean. Then, we only select those that are
+# _above_ a minimum z-value.
+#
+# Note: this calculation of the standard deviation is biased towards a large value because
+# it includes the clusters. In the SVA catalog this may not be an issue because clusters
+# will be few and far between, but it's something to consider.
+sigma = np.std(H)
+mu = np.mean(H)
+data_normed = (H - mu)/sigma # z-values for each bin
+minz = 2
+# These are the "bin" coordinates and need translating. A lil bit of list comprehension
+# never hurt nobody.
+clusters_normed = find_clusters(data_normed, minz)
+clusters_field = [[xedges[binx], yedges[biny]] for (binx, biny) in clusters_normed]
+# Would've used a list comprehension here but couldn't figure it out.
 cluster_patches = []
 for cluster in clusters_field:
-    cluster_patches.append(patches.Rectangle(cluster, width, width,
+    cluster_patches.append(patches.Rectangle(cluster, bin_width, bin_width,
                                              edgecolor='r', facecolor='none'))
 
 fig = plt.figure(figsize=(12,6))
+fig.suptitle('''Finding clusters with bin width = {} and min z-value = {}'''
+             .format(width, minz))
 gs=gridspec.GridSpec(1,3, width_ratios=[4,4,0.2])
 ax1 = plt.subplot(gs[0])
 ax2 = plt.subplot(gs[1])
 ax3 = plt.subplot(gs[2])
-ax1.imshow(data, cmap='binary')
+ax1.scatter(galaxy_data[0], galaxy_data[1], marker='.')
 for cluster_patch in cluster_patches:
     ax1.add_patch(cluster_patch)
-SC = ax2.imshow(data_normed)
+# The transposing stuff here is weird. Haven't figured out why I need to just
+# this quite yet but will update when it makes some sense.
+SC = ax2.imshow(data_normed.transpose()[::-1])
 cax1 = plt.colorbar(SC, cax=ax3)
 cax1.set_label('$\sigma$', size = 20)
 plt.tight_layout()
