@@ -71,6 +71,9 @@ ax1 = plt.subplot(gs[0])
 ax2 = plt.subplot(gs[1])
 ax3 = plt.subplot(gs[2])
 ax1.scatter(galaxy_data[0], galaxy_data[1], marker='.')
+ax1.set_xlim(0, galaxy_width)
+ax1.set_ylim(0, galaxy_width)
+ax1.set_aspect('equal')
 for cluster_patch in cluster_patches:
     ax1.add_patch(cluster_patch)
 # The transposing stuff here is weird. Haven't figured out why I need to just
