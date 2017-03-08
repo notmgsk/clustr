@@ -38,10 +38,9 @@ add_cluster([300, 300], 10, 15)
 # Histogram configuration
 N_bins = 15
 bin_width = galaxy_width // N_bins
-H, xedges, yedges = np.histogram2d(galaxy_data[0], galaxy_data[1], bins=N_bins)
 # xedges and yedges are the corners of the bins used by np.histogram2d. Useful for when we
 # need to convert from "bin" coordinates into "real" coordinates. 
-edges = np.array(list(zip(xedges, yedges)))
+H, xedges, yedges = np.histogram2d(galaxy_data[0], galaxy_data[1], bins=N_bins)
 # In order to give some significance to the clusters, we calculate the number of standard
 # deviations (i.e. z-value) away from the mean. Then, we only select those that are
 # _above_ a minimum z-value.
