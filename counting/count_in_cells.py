@@ -65,7 +65,7 @@ for cluster in clusters_field:
 
 fig = plt.figure(figsize=(12,6))
 fig.suptitle('''Finding clusters with bin width = {} and min z-value = {}'''
-             .format(width, minz))
+             .format(bin_width, minz))
 gs=gridspec.GridSpec(1,3, width_ratios=[4,4,0.2])
 ax1 = plt.subplot(gs[0])
 ax2 = plt.subplot(gs[1])
