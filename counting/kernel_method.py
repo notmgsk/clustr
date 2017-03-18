@@ -1,51 +1,13 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
+import astropy.coordinates as coord
+import astropy.units as u
+from astropy.io import fits
+from matplotlib import patches
 import scipy.stats as stats
 from matplotlib import gridspec
-from matplotlib import patches
-
-def insert_around(data, datum, loc):
-    drow = datum.shape[0]//2
-    dcol = datum.shape[1]//2
-    row = loc[0]
-    col = loc[1]
-    data[(row-drow):(row+drow), (col-dcol):(col+dcol)] = datum
-
-    return None
-
-def add_cluster(loc, scale, size):
-    global galaxy_data
-
-    x_cluster = np.random.normal(loc[0], scale, size)
-    y_cluster = np.random.normal(loc[1], scale, size)
-
-    galaxy_data[0] = np.append(galaxy_data[0], x_cluster)
-    galaxy_data[1] = np.append(galaxy_data[1], y_cluster)
-
-    return (loc, scale, size)
-
-def find_clusters(data, cond):
-    """Returns the coordinates of overdensities (i.e. where cond is
-    satisfied)"""
-    # For now, data is expected to be data_normed. It might be more useful to
-    # have the input data be the galaxy field, and then this particular
-    # function would call count_in_cells, and return the relevent coordinates
-    # pointing into the galaxy field, rather than into the density map (i.e.
-    # data_normed). I say this would be more useful because, currently, after
-    # calling this function, we have to manually convert the coordinates from
-    # data_normed coords into galaxy field coords.
-    return np.argwhere(data > cond) 
-
-
-# Set up the galaxy field
-galaxy_width = 400
-N_field_gals = 30
-galaxy_data = [np.random.rand(N_field_gals) * galaxy_width,
-               np.random.rand(N_field_gals) * galaxy_width]
-
-add_cluster([200, 125], 10, 20)
-add_cluster([300, 300], 10, 15)
-
+import networkx as nx
 
 def gaussian_estimator(galaxy_data,p,h):
     """ 
@@ -91,53 +53,142 @@ def gaussian_estimator(galaxy_data,p,h):
     density_fourier = kernel_fourier*data_fourier #convolve the kernel
     #and the data
 
-    density = np.fft.ifft2(density_fourier) #perform the inverse
+    density = np.real(np.fft.ifft2(density_fourier)) #perform the inverse
     #fourier transform to get the density in real space
     
     return density, xgr, ygr, xedges, yedges, bin_width
 
+def find_clusters(data, cond):
+    """Returns the coordinates of overdensities (i.e. where cond is
+    satisfied)"""
+    # For now, data is expected to be data_normed. It might be more useful to
+    # have the input data be the galaxy field, and then this particular
+    # function would call count_in_cells, and return the relevent coordinates
+    # pointing into the galaxy field, rather than into the density map (i.e.
+    # data_normed). I say this would be more useful because, currently, after
+    # calling this function, we have to manually convert the coordinates from
+    # data_normed coords into galaxy field coords.
+    return np.argwhere(data > cond)
 
-# this is the optimal window width as defined in Silverman, gives a
-# really small window width but not very useful
+def kernel_bandwidth(galaxy_data, p, z):
+    """Finds the appropriate bandwidth for the kernel using the angular
+    diameter size at a given redshift z.
 
-# h = (4/3)**(1/5)*np.std(data)*np.sum(data)**(-1/5)
+    Dependent upon the power of two used for the Fourier bins."""
 
-h = 10
+    import scipy.integrate as integrate
+    
+    RA_range = max(galaxy_data[0]) - min(galaxy_data[0])
+    DEC_range = max(galaxy_data[1]) - min(galaxy_data[1])
+    ang_range = 0.5*(RA_range + DEC_range)
 
-density, xgr, ygr, xedges, yedges, bin_width = gaussian_estimator(galaxy_data, 7, h)
+    #distance measures
+    Om = 0.308 #matter density parameter
+    Ol = 0.692
+    Dh = 3e5/(67.8) #hubble distance in Mpc
 
-mind = 1 #min density for cluster detection
+    Da = (Dh/(1+z))*(integrate.quad(lambda x: 1/np.sqrt(Om*(1+z)**3 +
+                                                        Ol), 0, z)[0])
+    #angular diameter distance as a function of redshit l/theta [Mpc/rad]
 
-clusters = find_clusters(density, mind)
-clusters_field = [[xedges[binx], yedges[biny]] for (binx, biny) in clusters]
-cluster_patches = []
+    ang_cluster = (1/Da)*(180/np.pi) #typical cluster radius 1 Mpc, yields typical
+    #angular size in degrees
+    p = 9 #2^p bins for fourier transform in gaussian estimator
+    ang_bins = ang_range/2**p #angle per bin
 
-# this is code to draw lines from each point to the others in the
-# detected cluster - doesn't work as expected but may be useful later
+    h = ang_cluster/ang_bins #the window width for the gaussian estimator
+    #should be the number of bins that a cluster would typically
+    #occupy
 
-# line_to = [Path.LINETO]*(len(clusters_field)-1)
-# cluster_codes = [Path.MOVETO] + line_to 
-# cluster_verts = np.array(map(list, (clusters_field)))
-# path = Path(cluster_verts, cluster_codes)
-# cluster_patch = patches.PathPatch(path, facecolor='r', lw=1)
+    return h
 
-for cluster in clusters_field:
-    cluster_patches.append(patches.Rectangle(cluster, bin_width,
-                                             bin_width, edgecolor =
-                                             'r', facecolor = 'none'))
+
+def find_groups(data, r=1):
+    """Returns the cluster groups; i.e., if there are neighbouring
+    overdensities from the galaxy histogram, they are considered to be part of
+    the same cluster (group).
+
+    Note: data should be the overdensities in the histogram picked out by find_clusters."""
+    def dist(v1, v2):
+        return (data[v1][0] - data[v2][0])**2 + (data[v1][1] - data[v2][1])**2
+    
+    # Vertices are unique labels for each point in data
+    verts = np.arange(len(data))
+    # The problem now is to construct edges between vertices. An edge between two vertices
+    # exists if the distance between the two corresponding points <= r.
+    # These edges include duplicates but that's ok... doesn't affect the end goal.
+    edges = [[v1, v2] for v1 in verts for v2 in verts if dist(v1, v2) <= r]
+    # Groups is a list of sets, each set containing the connected vertices of
+    # that group.
+    groups = list(map(list, nx.connected_components(nx.Graph(edges))))
+    # Now we want to go back from vertices to data points.
+    # So, where we started with something like
+    #    [A, B, C, D, E]    (with A, B, etc. of shape (1,2))
+    # we return something like
+    #    [[A, B, C], [D], [E]].
+    return [data[group] for group in groups]
+
+def average_position(group, weights):
+    totw = np.sum(weights)
+
+    avgx = np.sum([x * w for (x,w) in zip(group[:,0], weights)])/totw
+    avgy = np.sum([y * w for (y,w) in zip(group[:,1], weights)])/totw
+
+    return [avgx, avgy]
+
+
+
+#import the data
+hdulist = fits.open("sva1_gold_r1.0_catalog.fits")
+
+data = hdulist[1].data[1:5000]
+galmask = data['MODEST_CLASS'] == 1
+galdata = data[galmask]
+
+RA = galdata['RA']
+DEC = galdata['DEC']
+
+galaxy_data = [RA, DEC]
+
+p = 8 #2^p bins for Fourier transform
+z = 0.5 #redshift
+
+h = kernel_bandwidth(galaxy_data, p, z)
+
+density, xgr, ygr, xedges, yedges, bin_width = gaussian_estimator(galaxy_data, p, h)
+
+minz = 8  #min density for cluster detection
+
+clusters = find_clusters(density, minz)
+
+groups = find_groups(clusters, 4)
+groups_field = [np.array(list(map(list, (zip(xedges[group[:,0]],
+                                             yedges[group[:,1]])))))
+                for group in groups]
+weights = [density[group[:,0], group[:,1]] for group in groups]
+groups_avg = np.array([average_position(group, weight) for (group, weight) in
+                       list(map(list, zip(groups_field, weights)))])
+
+
+plt.rc('font', family='serif')
+plt.rc('xtick', labelsize='x-small')
+plt.rc('ytick', labelsize='x-small')
 
 fig = plt.figure(figsize=(12,6))
-plt.suptitle('Gaussian kernel estimation with $h = {}$'.format(h))
+plt.suptitle('Gaussian kernel estimation with h = {:04f}, $\delta >${}'.format(h, minz))
 gs=gridspec.GridSpec(1,3, width_ratios=[4,4,0.2])
 ax1 = plt.subplot(gs[0])
 ax2 = plt.subplot(gs[1])
 ax3 = plt.subplot(gs[2])
-ax1.scatter(galaxy_data[0], galaxy_data[1], marker='.')
-for cluster_patch in cluster_patches:
-    ax1.add_patch(cluster_patch)
-SC = ax2.imshow(np.real(density).transpose()[::-1])
+ax1.scatter(galaxy_data[0], galaxy_data[1], marker='.', s=2)
+ax1.set_aspect('equal')
+ax1.set_xlabel('RA (deg)')
+ax1.set_ylabel('Dec (deg)')
+ax1.set_xlim([min(galaxy_data[0]), max(galaxy_data[0])])
+ax1.set_ylim([min(galaxy_data[1]), max(galaxy_data[1])])
+SC = ax2.imshow(density.transpose()[::-1])
 cax1 = plt.colorbar(SC, cax=ax3)
-plt.tight_layout()
+cax1.set_label('$\delta$')
+plt.savefig('graphing_kernel.png')
 plt.show()
-
 
