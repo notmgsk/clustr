@@ -1,7 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.stats as stats
 from matplotlib import gridspec
 import matplotlib.patches as patches
+import matplotlib as mpl
+from matplotlib import rc
 import networkx as nx
 
 def add_cluster(loc, scale, size):
@@ -32,15 +35,17 @@ def find_groups(data, r=1):
     overdensities from the galaxy histogram, they are considered to be part of
     the same cluster (group).
 
-    Note: data should be the overdensities in the histogram picked out by find_clusters."""
+    Note: data should be the overdensities in the histogram picked out by
+    find_clusters.""" 
     def dist(v1, v2):
         return (data[v1][0] - data[v2][0])**2 + (data[v1][1] - data[v2][1])**2
     
     # Vertices are unique labels for each point in data
     verts = np.arange(len(data))
-    # The problem now is to construct edges between vertices. An edge between two vertices
-    # exists if the distance between the two corresponding points <= r.
-    # These edges include duplicates but that's ok... doesn't affect the end goal.
+    # The problem now is to construct edges between vertices. An edge between
+    # two vertices exists if the distance between the two corresponding points
+    # <= r. These edges include duplicates but that's ok... doesn't affect the
+    # end goal.
     edges = [[v1, v2] for v1 in verts for v2 in verts if dist(v1, v2) <= r]
     # Groups is a list of sets, each set containing the connected vertices of
     # that group.
@@ -50,20 +55,38 @@ def find_groups(data, r=1):
     #    [A, B, C, D, E]    (with A, B, etc. of shape (1,2))
     # we return something like
     #    [[A, B, C], [D], [E]].
-    return [data[group] for group in groups]
+    return np.array([data[group] for group in groups])
 
-def average_position(group, weights):
-    totw = np.sum(weights)
+def average_position(points):
+    """Returns the average position of points; shape of points must be (N,2),
+    and average is calculated along columns"""  
+    # totw = np.sum(weights)
 
-    avgx = np.sum([x * w for (x,w) in zip(group[:,0], weights)])/totw
-    avgy = np.sum([y * w for (y,w) in zip(group[:,1], weights)])/totw
+    # avgx = np.sum([x * w for (x,w) in zip(group[:,0], weights)])/totw
+    # avgy = np.sum([y * w for (y,w) in zip(group[:,1], weights)])/totw
+    return [np.sum(points[:,0])/len(points),
+            np.sum(points[:,1])/len(points)]
 
-    return [avgx, avgy]
+def indices_in_bin(binn, binnums):
+    """Returns the indices of elements of binnums for which the bin is equal to
+    binn""" 
+    return np.argwhere([(row == binn).all() for row in binnums.T]).ravel()
 
+def points_in_bin(binn, binnums):
+    """Returns an array of [RA, DEC] points that are within binn"""
+    global galaxy_data
+    indices = indices_in_bin(binn, binnums)
 
-# Set up the galaxy field
+    return np.column_stack((galaxy_data[0][indices], galaxy_data[1][indices]))
+
+def points_in_group(group, binnums):
+    """Returns an array of [RA, DEC] points that are within group's bins"""
+    return np.concatenate(([points_in_bin(binn, binnums) for binn in
+                            group]))
+
+#Set up the galaxy field
 galaxy_width = 400
-N_field_gals = 200
+N_field_gals = 40
 galaxy_data = [np.random.rand(N_field_gals) * galaxy_width,
                np.random.rand(N_field_gals) * galaxy_width]
 
@@ -71,51 +94,73 @@ add_cluster([200, 125], 10, 20)
 add_cluster([300, 300], 10, 15)
 
 # Histogram configuration
-N_bins = 20
+N_bins = 25
 bin_width = galaxy_width // N_bins
-# xedges and yedges are the corners of the bins used by np.histogram2d. Useful for when we
-# need to convert from "bin" coordinates into "real" coordinates. 
-H, xedges, yedges = np.histogram2d(galaxy_data[0], galaxy_data[1], bins=N_bins)
-# In order to give some significance to the clusters, we calculate the number of standard
-# deviations (i.e. z-value) away from the mean. Then, we only select those that are
-# _above_ a minimum z-value.
-#
-# Note: this calculation of the standard deviation is biased towards a large value because
-# it includes the clusters. In the SVA catalog this may not be an issue because clusters
+# xedges and yedges are the corners of the bins used by np.histogram2d. Useful
+# for when we need to convert from "bin" coordinates into "real" coordinates.
+H, xedges, yedges, binnums = stats.binned_statistic_2d(galaxy_data[0],
+                                                       galaxy_data[1],
+                                                       values=None,
+                                                       statistic='count',
+                                                       bins=N_bins,
+                                                       expand_binnumbers=True)
+# binnums seems to start counting from 1, not 0.
+binnums -= 1
+# In order to give some significance to the clusters, we calculate the number
+# of standard deviations (i.e. z-value) away from the mean. Then, we only
+# select those that are _above_ a minimum z-value. Note: this calculation of
+# the standard deviation is biased towards a large value because it includes
+# the clusters. In the SVA catalog this may not be an issue because clusters
 # will be few and far between, but it's something to consider.
 sigma = np.std(H)
 mu = np.mean(H)
 data_normed = (H - mu)/sigma # z-values for each bin
 minz = 3
-# These are the "bin" coordinates and need translating. A lil bit of list comprehension
-# never hurt nobody.
+# These are the "bin" coordinates and need translating. A lil bit of list
+# comprehension never hurt nobody.
 clusters_normed = find_clusters(data_normed, minz)
-clusters_field = [[xedges[binx], yedges[biny]] for (binx, biny) in clusters_normed]
+clusters_field = [[xedges[binx], yedges[biny]] for (binx, biny) in
+                  clusters_normed] 
 # Would've used a list comprehension here but couldn't figure it out.
 cluster_patches = []
 for cluster in clusters_field:
     cluster_patches.append(patches.Rectangle(cluster, bin_width, bin_width,
-                                             edgecolor='b', facecolor='none', alpha=0.25))
+                                             edgecolor='b', facecolor='none',
+                                             alpha=0.25)) 
 
 groups = find_groups(clusters_normed, 3)
-# There's gotta be a nicer way to do this. Ugly as f right now. All it's doing is
-# converting from bin coordinates to real coordinates, but man is it ugly.
-groups_field = [np.array(list(map(list, (zip(xedges[group[:,0]], yedges[group[:,1]])))))
+# There's gotta be a nicer way to do this. Ugly as f right now. All it's doing
+# is converting from bin coordinates to real coordinates, but man is it ugly.
+groups_field = [np.array(list(map(list, (zip(xedges[group[:,0]],
+                                             yedges[group[:,1]]))))) 
                 for group in groups] 
-weights = [H[group[:,0], group[:,1]] for group in groups]
-# This is converted to a numpy array so we can use array slicing on it later.
-groups_avg = np.array([average_position(group, weight) for (group, weight) in
-                       map(list, zip(groups_field, weights))])
+# weights = [H[group[:,0], group[:,1]] for group in groups]
+# # This is converted to a numpy array so we can use array slicing on it later.
+# groups_avg = np.array([average_position(group, weight) for (group, weight) in
+#                        map(list, zip(groups_field, weights))])
+groups_avg_pos = np.array([average_position(points_in_group(group, binnums))
+                           for group in groups])
+
+
+mpl.rc('lines', linewidth = 2)
+plt.rcParams['font.family'] = 'Times New Roman'
+mpl.rcParams['xtick.labelsize'] = 16
+mpl.rcParams['ytick.labelsize'] = 16
+mpl.rcParams['axes.labelsize'] = 20
+mpl.rcParams['font.size'] = 18
+# mpl.rcParams['text.usetex'] = True
+rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
+#rc('text', usetex=True)
 
 fig = plt.figure(figsize=(12,6))
 fig.suptitle('''Finding clusters with bin width = {} and min z-value = {}'''
-             .format(bin_width, minz))
+             .format(bin_width, minz), y=0.92)
 gs=gridspec.GridSpec(1,3, width_ratios=[4,4,0.2])
 ax1 = plt.subplot(gs[0])
 ax2 = plt.subplot(gs[1])
 ax3 = plt.subplot(gs[2])
 ax1.scatter(galaxy_data[0], galaxy_data[1], marker='.', s=2)
-ax1.scatter(groups_avg[:,0] + bin_width/2, groups_avg[:,1] + bin_width/2,
+ax1.scatter(groups_avg_pos[:,0], groups_avg_pos[:,1],
             marker='x', s=80, c='r') 
 ax1.set_xlim(0, galaxy_width)
 ax1.set_ylim(0, galaxy_width)
@@ -127,8 +172,7 @@ for cluster_patch in cluster_patches:
 SC = ax2.imshow(data_normed.transpose()[::-1])
 cax1 = plt.colorbar(SC, cax=ax3)
 cax1.set_label('$\sigma$', size = 20)
-plt.tight_layout()
-plt.show()
+plt.show(block=False)
 # plt.savefig("test.png")
 
 
