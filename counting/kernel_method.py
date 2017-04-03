@@ -26,18 +26,35 @@ def gaussian_estimator(galaxy_data,p,h):
     h: window width (smoothing parameter)
         
     """
-
-    M = 2**p #number of bins
+    
+    #need to account for the fact that the bin widths won't be equal in height
+    #and width
+    data_width = max(galaxy_data[0]) - min(galaxy_data[0])
+    data_height = max(galaxy_data[1]) - min(galaxy_data[1])
+    data_ratio = data_height/data_width
+    
+    M = 2**p #number of bins (width)
+    
     n = np.size(galaxy_data)
     length = len(galaxy_data)
     a = 0 #limits
     b = length
-
-    bin_width = (b-a)/M #the width of each discrete cell
-
-    data_discrete, xedges, yedges = np.histogram2d(galaxy_data[0],
-    galaxy_data[1], bins = M) 
     
+    bw_width = (b-a)/M #the width of each discrete cell
+    bw_height = bw_width*data_ratio #the height of each discrete cell
+           
+    #data_discrete, xedges, yedges = np.histogram2d(galaxy_data[0], galaxy_data[1], bins = M)
+    
+    # xedges and yedges are the corners of the bins used by np.histogram2d. Useful
+    # for when we need to convert from "bin" coordinates into "real" coordinates.
+    data_discrete, xedges, yedges, binnums = stats.binned_statistic_2d(galaxy_data[0],
+                                                       galaxy_data[1],
+                                                       values=None,
+                                                       statistic='count',
+                                                       bins=M,
+                                                       expand_binnumbers=True)
+    
+
     data_fourier = np.fft.fft2(data_discrete) #fourier transform the
     #discrete data
 
@@ -56,7 +73,15 @@ def gaussian_estimator(galaxy_data,p,h):
     density = np.real(np.fft.ifft2(density_fourier)) #perform the inverse
     #fourier transform to get the density in real space
     
-    return density, xgr, ygr, xedges, yedges, bin_width
+    mu = np.mean(density)
+    
+    sigma = np.std(density)
+    
+    density_normed = (density - mu)/sigma
+                     
+    binnums -= 1
+    
+    return density_normed, xgr, ygr, xedges, yedges, bw_width, bw_height, binnums
 
 def find_clusters(data, cond):
     """Returns the coordinates of overdensities (i.e. where cond is
@@ -93,7 +118,9 @@ def kernel_bandwidth(galaxy_data, p, z):
 
     ang_cluster = (1/Da)*(180/np.pi) #typical cluster radius 1 Mpc, yields typical
     #angular size in degrees
-    p = 9 #2^p bins for fourier transform in gaussian estimator
+    
+    p = 9
+    
     ang_bins = ang_range/2**p #angle per bin
 
     h = ang_cluster/ang_bins #the window width for the gaussian estimator
@@ -126,22 +153,45 @@ def find_groups(data, r=1):
     #    [A, B, C, D, E]    (with A, B, etc. of shape (1,2))
     # we return something like
     #    [[A, B, C], [D], [E]].
-    return [data[group] for group in groups]
+    return np.array([data[group] for group in groups])
 
-def average_position(group, weights):
-    totw = np.sum(weights)
+def average_position(points):
+    #totw = np.sum(weights)
+    #avgx = np.sum([x * w for (x,w) in zip(group[:,0], weights)])/totw
+    #avgy = np.sum([y * w for (y,w) in zip(group[:,1], weights)])/totw
+    
+    if points.shape == 0:
+        avg_pos = []
+    
+    else:
+        avg_pos = [np.sum(points[:,0])/len(points),
+            np.sum(points[:,1])/len(points)]
+    
+    return avg_pos
+    
+def indices_in_bin(binn, binnums):
+    """Returns the indices of elements of binnums for which the bin is equal to
+    binn""" 
+    return np.argwhere([(row == binn).all() for row in binnums.T]).ravel()
 
-    avgx = np.sum([x * w for (x,w) in zip(group[:,0], weights)])/totw
-    avgy = np.sum([y * w for (y,w) in zip(group[:,1], weights)])/totw
+def points_in_bin(binn, binnums):
+    """Returns an array of [RA, DEC] points that are within binn"""
+    global galaxy_data
+    indices = indices_in_bin(binn, binnums)
 
-    return [avgx, avgy]
+    return np.column_stack((galaxy_data[0][indices], galaxy_data[1][indices]))
 
+def points_in_group(group, binnums):
+    """Returns an array of [RA, DEC] points that are within group's bins"""
+    return np.concatenate(([points_in_bin(binn, binnums) for binn in
+                            group]))
 
+################################################################################
 
 #import the data
 hdulist = fits.open("sva1_gold_r1.0_catalog.fits")
 
-data = hdulist[1].data[1:5000]
+data = hdulist[1].data[0:5000]
 galmask = data['MODEST_CLASS'] == 1
 galdata = data[galmask]
 
@@ -155,9 +205,9 @@ z = 0.5 #redshift
 
 h = kernel_bandwidth(galaxy_data, p, z)
 
-density, xgr, ygr, xedges, yedges, bin_width = gaussian_estimator(galaxy_data, p, h)
+density, xgr, ygr, xedges, yedges, bw_width, bw_height, binnums = gaussian_estimator(galaxy_data, p, h)
 
-minz = 8  #min density for cluster detection
+minz = 3  #min density for cluster detection
 
 clusters = find_clusters(density, minz)
 
@@ -166,29 +216,41 @@ groups_field = [np.array(list(map(list, (zip(xedges[group[:,0]],
                                              yedges[group[:,1]])))))
                 for group in groups]
 weights = [density[group[:,0], group[:,1]] for group in groups]
-groups_avg = np.array([average_position(group, weight) for (group, weight) in
-                       list(map(list, zip(groups_field, weights)))])
 
+#groups_avg = np.array([average_position(group, weight) for (group, weight) in
+#                       list(map(list, zip(groups_field, weights)))])
+
+rick = [points_in_group(group, binnums) for group in groups]
+rick = [y for y in rick if 0 not in y.shape]
+
+groups_avg_pos = np.array([average_position(morty) for morty in rick])
 
 plt.rc('font', family='serif')
 plt.rc('xtick', labelsize='x-small')
 plt.rc('ytick', labelsize='x-small')
 
 fig = plt.figure(figsize=(12,6))
-plt.suptitle('Gaussian kernel estimation with h = {:04f}, $\delta >${}'.format(h, minz))
+plt.suptitle('Gaussian kernel estimation with $h = {:04f}$, $\sigma >{}$'.format(h, minz))
 gs=gridspec.GridSpec(1,3, width_ratios=[4,4,0.2])
 ax1 = plt.subplot(gs[0])
 ax2 = plt.subplot(gs[1])
 ax3 = plt.subplot(gs[2])
 ax1.scatter(galaxy_data[0], galaxy_data[1], marker='.', s=2)
-ax1.set_aspect('equal')
+ax1.scatter(groups_avg_pos[:,0] - bw_width/2, groups_avg_pos[:,1] - bw_height/2,
+            marker='x', s=80, c='r') 
+#ax1.set_aspect('equal')
 ax1.set_xlabel('RA (deg)')
 ax1.set_ylabel('Dec (deg)')
 ax1.set_xlim([min(galaxy_data[0]), max(galaxy_data[0])])
 ax1.set_ylim([min(galaxy_data[1]), max(galaxy_data[1])])
 SC = ax2.imshow(density.transpose()[::-1])
 cax1 = plt.colorbar(SC, cax=ax3)
-cax1.set_label('$\delta$')
+cax1.set_label('$\sigma$')
 plt.savefig('graphing_kernel.png')
 plt.show()
 
+#write some code to save the cluster positions to a text file inc. significance
+RA_pos = groups_avg_pos[:,0] - bw_width/2
+DEC_pos = groups_avg_pos[:,1] - bw_height/2
+#sig = np.array([density[cluster[0], cluster[1]] for cluster in clusters])                       
+np.savetxt('cluster_locs.txt', np.transpose([RA_pos, DEC_pos]), delimiter = ' ')
