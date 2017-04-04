@@ -9,17 +9,13 @@ from matplotlib import rc
 #import the data
 hdulist = fits.open("sva1_gold_r1.0_catalog.fits")
 
-data = hdulist[1].data
+data = hdulist[1].data[::100000]
 galmask = data['MODEST_CLASS'] == 1
 galdata = data[galmask]
-
 RA = galdata['RA']
-DEC = galdata['DEC']
-
-galaxy_data = [RA, DEC]
 
 #these must correspond to the indices of the spt-e survey since no other data points lie in this RA range
-spte_arg = np.argwhere((galaxy_data[0] < 99) & (galaxy_data[0] > 60))
+spte_arg = np.argwhere((RA < 99) & (RA > 60))
 
 #spte_ra = [np.array(galaxy_data[0][arg]) for arg in spte_arg]
 #spte_ra = np.array([item for sublist in spte_ra for item in sublist])
@@ -27,16 +23,15 @@ spte_arg = np.argwhere((galaxy_data[0] < 99) & (galaxy_data[0] > 60))
 #spte_dec = np.array([item for sublist in spte_dec for item in sublist])
 #spte_data = [spte_ra, spte_dec]
 
-spte_ra = data['RA'][spte_arg]
-spte_dec = data['DEC'][spte_arg]
-magdata_G = data['MAG_AUTO_G'][spte_arg]
-magdata_R = data['MAG_AUTO_R'][spte_arg]
-magdata_I = data['MAG_AUTO_I'][spte_arg]
-magdata_Z = data['MAG_AUTO_Z'][spte_arg]
+spte_ra = galdata['RA'][spte_arg]
+spte_dec = galdata['DEC'][spte_arg]
+magdata_G = galdata['MAG_AUTO_G'][spte_arg]
+magdata_R = galdata['MAG_AUTO_R'][spte_arg]
+magdata_I = galdata['MAG_AUTO_I'][spte_arg]
+magdata_Z = galdata['MAG_AUTO_Z'][spte_arg]
 
 
 #save the data in a new, condensed fits file
-
 
 tbhdu = fits.BinTableHDU.from_columns( [fits.Column(name='RA', format='E', array=spte_ra),         fits.Column(name='DEC', format='E', array=spte_dec), fits.Column(name = 'MAG_AUTO_G', format = 'E', array = magdata_G), fits.Column(name = 'MAG_AUTO_R', format = 'E', array = magdata_R), fits.Column(name = 'MAG_AUTO_I', format = 'E', array = magdata_I), fits.Column(name = 'MAG_AUTO_Z', format = 'E', array = magdata_Z), fits.Column(name = 'INDEX', format = 'D', array = spte_arg)])
 tbhdu.writeto('spte_sva1.fits')
@@ -52,8 +47,8 @@ mpl.rcParams['font.size'] = 18
 mpl.rcParams['text.usetex'] = True
 rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
 
-plt.figure()
-plt.scatter(spte_data[0], spte_data[1], marker = '.', s=2)
+plt.figure(figsize = (6,8))
+plt.scatter(spte_ra, spte_dec, marker = '.', s=2)
 plt.xlabel('RA (deg)')
 plt.ylabel('Dec (deg)')
 plt.savefig('spte_footprint.png', dpi=600, transparent = True)
