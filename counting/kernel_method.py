@@ -8,6 +8,8 @@ from matplotlib import patches
 import scipy.stats as stats
 from matplotlib import gridspec
 import networkx as nx
+import matplotlib as mpl
+from matplotlib import rc
 
 def gaussian_estimator(galaxy_data,p,h):
     """ 
@@ -207,7 +209,7 @@ h = kernel_bandwidth(galaxy_data, p, z)
 
 density, xgr, ygr, xedges, yedges, bw_width, bw_height, binnums = gaussian_estimator(galaxy_data, p, h)
 
-minz = 3  #min density for cluster detection
+minz = 2.5  #min density for cluster detection
 
 clusters = find_clusters(density, minz)
 
@@ -216,21 +218,28 @@ groups_field = [np.array(list(map(list, (zip(xedges[group[:,0]],
                                              yedges[group[:,1]])))))
                 for group in groups]
 weights = [density[group[:,0], group[:,1]] for group in groups]
+sigs = [np.mean(vals) for vals in weights]
 
 #groups_avg = np.array([average_position(group, weight) for (group, weight) in
 #                       list(map(list, zip(groups_field, weights)))])
 
 rick = [points_in_group(group, binnums) for group in groups]
-rick = [y for y in rick if 0 not in y.shape]
+#removing the nans by the following line means that the significances don't correspond to their physical positions
+#rick = [y for y in rick if 0 not in y.shape]
 
 groups_avg_pos = np.array([average_position(morty) for morty in rick])
 
-plt.rc('font', family='serif')
-plt.rc('xtick', labelsize='x-small')
-plt.rc('ytick', labelsize='x-small')
+mpl.rc('lines', linewidth = 2)
+plt.rcParams['font.family'] = 'Times New Roman'
+mpl.rcParams['xtick.labelsize'] = 16
+mpl.rcParams['ytick.labelsize'] = 16
+mpl.rcParams['axes.labelsize'] = 20
+mpl.rcParams['font.size'] = 18
+mpl.rcParams['text.usetex'] = True
+rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
 
 fig = plt.figure(figsize=(12,6))
-plt.suptitle('Gaussian kernel estimation with $h = {:04f}$, $\sigma >{}$'.format(h, minz))
+plt.suptitle('$z = {}$, $h = {:04f}$, $\sigma >{}$'.format(z, h, minz))
 gs=gridspec.GridSpec(1,3, width_ratios=[4,4,0.2])
 ax1 = plt.subplot(gs[0])
 ax2 = plt.subplot(gs[1])
@@ -246,11 +255,11 @@ ax1.set_ylim([min(galaxy_data[1]), max(galaxy_data[1])])
 SC = ax2.imshow(density.transpose()[::-1])
 cax1 = plt.colorbar(SC, cax=ax3)
 cax1.set_label('$\sigma$')
-plt.savefig('graphing_kernel.png')
+plt.savefig('kernel_4417.png', dpi = 600, transparent = True)
 plt.show()
 
 #write some code to save the cluster positions to a text file inc. significance
 RA_pos = groups_avg_pos[:,0] - bw_width/2
 DEC_pos = groups_avg_pos[:,1] - bw_height/2
 #sig = np.array([density[cluster[0], cluster[1]] for cluster in clusters])                       
-np.savetxt('cluster_locs.txt', np.transpose([RA_pos, DEC_pos]), delimiter = ' ')
+np.savetxt('cluster_locs.txt', np.transpose([RA_pos, DEC_pos,sigs]), fmt = '%4.8f', delimiter = ' ', header = 'RA (deg)  Dec (Deg)  Sigma')
