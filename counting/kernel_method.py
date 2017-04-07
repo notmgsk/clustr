@@ -10,6 +10,7 @@ from matplotlib import gridspec
 import networkx as nx
 import matplotlib as mpl
 from matplotlib import rc
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 def gaussian_estimator(galaxy_data,p,h):
     """ 
@@ -191,7 +192,7 @@ def points_in_group(group, binnums):
 ################################################################################
 
 #import the data
-hdulist = fits.open("spte_sva1.fits")
+hdulist = fits.open("spte_sva1_red.fits")
 
 data = hdulist[1].data
 #galmask = data['MODEST_CLASS'] == 1
@@ -202,14 +203,14 @@ DEC = data['DEC']
 
 galaxy_data = [RA, DEC]
 
-p = 8 #2^p bins for Fourier transform
+p = 10 #2^p bins for Fourier transform
 z = 0.5 #redshift
 
 h = kernel_bandwidth(galaxy_data, p, z)
 
 density, xgr, ygr, xedges, yedges, bw_width, bw_height, binnums = gaussian_estimator(galaxy_data, p, h)
 
-minz = 2  #min density for cluster detection
+minz = 2.5  #min density for cluster detection
 
 clusters = find_clusters(density, minz)
 
@@ -238,24 +239,30 @@ mpl.rcParams['font.size'] = 18
 mpl.rcParams['text.usetex'] = True
 rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
 
-fig = plt.figure(figsize=(12,8))
+fig = plt.figure(figsize=(12,6))
 plt.suptitle('$z = {}$, $h = {:04f}$, $\sigma >{}$'.format(z, h, minz))
 gs=gridspec.GridSpec(1,3, width_ratios=[4,4,0.2])
 ax1 = plt.subplot(gs[0])
 ax2 = plt.subplot(gs[1])
-ax3 = plt.subplot(gs[2])
+#ax3 = plt.subplot(gs[2])
 ax1.scatter(galaxy_data[0], galaxy_data[1], marker='.', s=2)
 ax1.scatter(groups_avg_pos[:,0] - bw_width/2, groups_avg_pos[:,1] - bw_height/2,
             marker='x', s=80, c='r') 
-#ax1.set_aspect('equal')
+ax1.set_aspect('equal')
 ax1.set_xlabel('RA (deg)')
 ax1.set_ylabel('Dec (deg)')
 ax1.set_xlim([min(galaxy_data[0]), max(galaxy_data[0])])
 ax1.set_ylim([min(galaxy_data[1]), max(galaxy_data[1])])
-SC = ax2.imshow(density.transpose()[::-1], cmap = "afmhot")
-cax1 = plt.colorbar(SC, cax=ax3)
-cax1.set_label('$\sigma$')
-plt.savefig('kernel_4417{}{}.png'.format(minz, z), dpi = 600, transparent = True)
+SC = ax2.imshow(density.transpose()[::-1], cmap = "jet")
+
+divider = make_axes_locatable(ax2)
+cax1 = divider.append_axes("right", size="5%", pad=0.08)
+
+cax2 = plt.colorbar(SC, cax = cax1)
+cax2.set_label('$\sigma$')
+
+plt.tight_layout()
+plt.savefig('kernel_minz{}_z{}.png'.format(minz, z), dpi = 600, transparent = True)
 plt.show()
 
 #write some code to save the cluster positions to a text file inc. significance
