@@ -8,9 +8,9 @@ from matplotlib import patches
 import scipy.stats as stats
 from matplotlib import gridspec
 import networkx as nx
-import matplotlib as mpl
-from matplotlib import rc
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+#os.environ['PATH'] = os.environ['PATH'] + ':/usr/texbin'
 
 def gaussian_estimator(galaxy_data,p,h):
     """ 
@@ -122,8 +122,6 @@ def kernel_bandwidth(galaxy_data, p, z):
     ang_cluster = (1/Da)*(180/np.pi) #typical cluster radius 1 Mpc, yields typical
     #angular size in degrees
     
-    p = 9
-    
     ang_bins = ang_range/2**p #angle per bin
 
     h = ang_cluster/ang_bins #the window width for the gaussian estimator
@@ -210,7 +208,7 @@ h = kernel_bandwidth(galaxy_data, p, z)
 
 density, xgr, ygr, xedges, yedges, bw_width, bw_height, binnums = gaussian_estimator(galaxy_data, p, h)
 
-minz = 2.5  #min density for cluster detection
+minz = 5  #min density for cluster detection
 
 clusters = find_clusters(density, minz)
 
@@ -230,43 +228,58 @@ rick = [points_in_group(group, binnums) for group in groups]
 
 groups_avg_pos = np.array([average_position(morty) for morty in rick])
 
-mpl.rc('lines', linewidth = 2)
-plt.rcParams['font.family'] = 'Times New Roman'
-mpl.rcParams['xtick.labelsize'] = 16
-mpl.rcParams['ytick.labelsize'] = 16
-mpl.rcParams['axes.labelsize'] = 20
-mpl.rcParams['font.size'] = 18
-mpl.rcParams['text.usetex'] = True
-rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
+#these control the plotting to produce handsome latex plots
+matplotlib.rcParams['lines.linewidth'] = 2
+matplotlib.rcParams['xtick.labelsize'] = 16
+matplotlib.rcParams['ytick.labelsize'] = 16
+matplotlib.rcParams['axes.labelsize'] = 20
+matplotlib.rcParams['font.size'] = 18
+matplotlib.rcParams['text.usetex']=True
+matplotlib.rcParams['text.latex.unicode']=True
 
+#plotting the actual figure
 fig = plt.figure(figsize=(12,6))
-plt.suptitle('$z = {}$, $h = {:04f}$, $\sigma >{}$'.format(z, h, minz))
-gs=gridspec.GridSpec(1,3, width_ratios=[4,4,0.2])
+plt.suptitle('$z = {}$, $h = {:04f}$, $\sigma >{}$'.format(z, h,
+                                                           minz))
+#defining the ratio of the two subplots - the empirical width ratios
+#just work to make the density map and scatter plot the same size
+gs=gridspec.GridSpec(1, 2, width_ratios=[1,1.067])
+#assign the axes to each subplot
 ax1 = plt.subplot(gs[0])
 ax2 = plt.subplot(gs[1])
-#ax3 = plt.subplot(gs[2])
-ax1.scatter(galaxy_data[0], galaxy_data[1], marker='.', s=2)
+#scatter plot
+ax1.scatter(galaxy_data[0], galaxy_data[1], marker='.', s=0.5, color='cornflowerblue')
 ax1.scatter(groups_avg_pos[:,0] - bw_width/2, groups_avg_pos[:,1] - bw_height/2,
             marker='x', s=80, c='r') 
 ax1.set_aspect('equal')
-ax1.set_xlabel('RA (deg)')
-ax1.set_ylabel('Dec (deg)')
+ax1.set_xlabel('$\mathrm{RA\ (deg)}$')
+ax1.set_ylabel('$\mathrm{Dec\ (deg)}$')
 ax1.set_xlim([min(galaxy_data[0]), max(galaxy_data[0])])
 ax1.set_ylim([min(galaxy_data[1]), max(galaxy_data[1])])
-SC = ax2.imshow(density.transpose()[::-1], cmap = "jet")
-
+#density map
+#cmap = plt.cm.jet for original
+#cmap = plt.cm.YlOrRd for fyah
+cb = ax2.imshow(density.transpose()[::-1], cmap = plt.cm.YlOrRd)
+#grim stuff for colorbar
 divider = make_axes_locatable(ax2)
 cax1 = divider.append_axes("right", size="5%", pad=0.08)
-
-cax2 = plt.colorbar(SC, cax = cax1)
+cax2 = plt.colorbar(cb, cax = cax1)
 cax2.set_label('$\sigma$')
-
 plt.tight_layout()
-plt.savefig('kernel_minz{}_z{}.png'.format(minz, z), dpi = 600, transparent = True)
+#save and show
+#plt.savefig('kernel_minz{}_z{}.png'.format(minz, z), dpi = 600, transparent = True)
 plt.show()
 
-#write some code to save the cluster positions to a text file inc. significance
+#RA and Dec positions
 RA_pos = groups_avg_pos[:,0] - bw_width/2
 DEC_pos = groups_avg_pos[:,1] - bw_height/2
-#sig = np.array([density[cluster[0], cluster[1]] for cluster in clusters])                       
-np.savetxt('cluster_locs{}{}.txt'.format(minz, z), np.transpose([RA_pos, DEC_pos,sigs]), fmt = '%4.8f', delimiter = ' ', header = 'RA (deg)  Dec (Deg)  Sigma')
+#sig = np.array([density[cluster[0], cluster[1]] for cluster in
+#clusters])
+
+#save cluster locations as a text file
+np.savetxt('clusterlocs_minz{}_z{}_p{}.txt'.format(minz, z, p),
+           np.transpose([RA_pos, DEC_pos,sigs]), fmt = '%4.8f',
+           delimiter = ' ', header = 'RA (deg)  Dec (Deg)  Sigma')
+#save density map as a text file
+np.savetxt('kd_minz{}_z{}_p{}.txt'.format(minz, z, p), density,
+           delimiter = ' ')
