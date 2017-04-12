@@ -10,7 +10,7 @@ from matplotlib import gridspec
 import networkx as nx
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-#os.environ['PATH'] = os.environ['PATH'] + ':/usr/texbin'
+os.environ['PATH'] = os.environ['PATH'] + ':/usr/texbin'
 
 def gaussian_estimator(galaxy_data,p,h):
     """ 
@@ -196,19 +196,21 @@ data = hdulist[1].data
 #galmask = data['MODEST_CLASS'] == 1
 #galdata = data[galmask]
 
-RA = data['RA']
-DEC = data['DEC']
+magmask = data['MAG_AUTO_R'] < 24.4
+
+RA = data['RA'][magmask]
+DEC = data['DEC'][magmask]
 
 galaxy_data = [RA, DEC]
 
-p = 10 #2^p bins for Fourier transform
+p = 8 #2^p bins for Fourier transform
 z = 0.5 #redshift
 
 h = kernel_bandwidth(galaxy_data, p, z)
 
 density, xgr, ygr, xedges, yedges, bw_width, bw_height, binnums = gaussian_estimator(galaxy_data, p, h)
 
-minz = 5  #min density for cluster detection
+minz = 4  #min density for cluster detection
 
 clusters = find_clusters(density, minz)
 
@@ -259,7 +261,7 @@ ax1.set_ylim([min(galaxy_data[1]), max(galaxy_data[1])])
 #density map
 #cmap = plt.cm.jet for original
 #cmap = plt.cm.YlOrRd for fyah
-cb = ax2.imshow(density.transpose()[::-1], cmap = plt.cm.YlOrRd)
+cb = ax2.imshow(density.transpose()[::-1], cmap = plt.cm.YlGnBu)
 #grim stuff for colorbar
 divider = make_axes_locatable(ax2)
 cax1 = divider.append_axes("right", size="5%", pad=0.08)
