@@ -1,4 +1,4 @@
-import count_in_cells as cic
+import abell as abell
 import numpy as np
 import scipy.stats as stats
 from astropy.io import fits
@@ -62,7 +62,7 @@ for i in np.arange(sva_catalog_size//interval):
     minz = 3
     # These are the "bin" coordinates and need translating. A lil bit of list
     # comprehension never hurt nobody.
-    clusters_normed = cic.find_clusters(data_normed, minz)
+    clusters_normed = abell.find_clusters(data_normed, minz)
     clusters_field = [[xedges[binx], yedges[biny]] for (binx, biny) in
                       clusters_normed] 
     # Would've used a list comprehension here but couldn't figure it out.
@@ -71,7 +71,7 @@ for i in np.arange(sva_catalog_size//interval):
     #     cluster_patches.append(patches.Rectangle(cluster, bin_width,
     #     bin_width, edgecolor='b', facecolor='none', alpha=0.25))
 
-    groups = cic.find_groups(clusters_normed, 4)
+    groups = abell.find_groups(clusters_normed, 4)
     # There's gotta be a nicer way to do this. Ugly as f right now. All it's
     # doing is converting from bin coordinates to real coordinates, but man is
     # it ugly.
@@ -83,9 +83,9 @@ for i in np.arange(sva_catalog_size//interval):
     # groups_avg = np.array([average_position(group, weight) for (group,
     # weight) in map(list, zip(groups_field, weights))])
     groups_avg_pos = np.array([
-        cic.average_position(cic.points_in_group(group,
-                                                 binnums,
-                                                 galaxy_data))
+        abell.average_position(abell.points_in_group(group,
+                                                     binnums,
+                                                     galaxy_data))
         for group in groups])
 
     # Finally, write our clusters to the file
@@ -95,44 +95,3 @@ for i in np.arange(sva_catalog_size//interval):
 
 clusters_fh.close()
 hdulist.close()
-
-# mpl.rc('lines', linewidth = 2)
-# plt.rcParams['font.family'] = 'Times New Roman'
-# mpl.rcParams['xtick.labelsize'] = 16
-# mpl.rcParams['ytick.labelsize'] = 16
-# mpl.rcParams['axes.labelsize'] = 20
-# mpl.rcParams['font.size'] = 18
-# # mpl.rcParams['text.usetex'] = True
-# rc('font', {'family': 'serif', 'serif': ['Computer Modern']})
-# #rc('text', usetex=True)
-
-# fig = plt.figure(figsize=(12,6))
-# fig.suptitle('''Finding clusters with {} bins and min z-value = {}'''
-#              .format(N_bins, minz))
-# gs=gridspec.GridSpec(1,3, width_ratios=[4,4,0.2])
-# ax1 = plt.subplot(gs[0])
-# ax2 = plt.subplot(gs[1])
-# ax3 = plt.subplot(gs[2])
-# ax1.scatter(galaxy_data[0], galaxy_data[1], marker='.', s=0.1)
-# ax1.scatter(groups_avg_pos[:,0], groups_avg_pos[:,1],
-#             marker='x', s=80, c='r') 
-# ax1.set_xlim(RAmin, RAmax)
-# ax1.set_ylim(DECmin, DECmax)
-# # ax1.set_aspect('equal')
-# # for cluster_patch in cluster_patches:
-# #     ax1.add_patch(cluster_patch)
-# # The transposing stuff here is weird. Haven't figured out why I need to just
-# # this quite yet but will update when it makes some sense.
-# SC = ax2.imshow(data_normed.transpose()[::-1])
-# cax1 = plt.colorbar(SC, cax=ax3)
-# cax1.set_label('$\sigma$', size = 20)
-# plt.show(block=False)
-# # plt.savefig("test.png")
-
-# #the normal distribution of this data set
-# # x = np.linspace(np.min(data_summed), np.max(data_summed), 1000)
-# # normal_dist = (1/sigma*np.sqrt(2*np.pi))*np.exp(-(x-mu)**2/2*sigma**2)
-# # plt.figure(3)
-# # plt.plot(x, normal_dist)
-# # plt.show()
-
