@@ -15,7 +15,18 @@ from astropy.coordinates import SkyCoord
 
 os.environ['PATH'] = os.environ['PATH'] + ':/usr/texbin'
 
+<<<<<<< HEAD
 #help
+=======
+#these control the plotting to produce handsome latex plots
+matplotlib.rcParams['lines.linewidth'] = 2
+matplotlib.rcParams['xtick.labelsize'] = 16
+matplotlib.rcParams['ytick.labelsize'] = 16
+matplotlib.rcParams['axes.labelsize'] = 20
+matplotlib.rcParams['font.size'] = 18
+matplotlib.rcParams['text.usetex']=True
+matplotlib.rcParams['text.latex.unicode']=True
+>>>>>>> restructuring
 
 def gaussian_estimator(galaxy_data,p,h):
     """ 
@@ -225,7 +236,11 @@ def get_clusters(galaxy_data, p, z, h, minz, linking, fname):
 ################################################################################
 p = 8 #2^p bins for Fourier transform
 z = 0.5 #redshift
+<<<<<<< HEAD
 minz = 3.5  #min density for cluster detection
+=======
+minz = 4 #min density for cluster detection
+>>>>>>> restructuring
 linking = 2 #linking length between groups
 
 #first find the clusters that occur naturally due to the distribution
@@ -235,6 +250,7 @@ h, ang_cluster = kernel_bandwidth(galaxy_data, p, z)
 natural_clusters = get_clusters(galaxy_data, p, z, h, minz, linking,
              'natural_clusters.txt')
 
+<<<<<<< HEAD
 #create the new galaxy field with placed clusters
 nclust = 10 #number of clusters to place in the field
 ng_min = 50 #minimum number of galaxies in a cluster
@@ -283,10 +299,88 @@ for j in range(0, len(found_clusters[0]) - 1):
     
     n_idx[j], n_sep2d[j], _ = match_coordinates_sky(f_catalog[j], n_catalog)
     l_idx[j], l_sep2d[j], _ = match_coordinates_sky(f_catalog[j], l_catalog)
+=======
+radius = [0.5, 0.75, 1.0, 1.25, 1.50]
+
+for rad in radius:
+    
+    N = 10 #number of runs
+    run = 0
+    n_matches = []
+    l_matches = []
+    
+    while run < N:
+        #create the new galaxy field with placed clusters
+        nclust = 10 #number of clusters to place in the field
+        ng_min = 100 #minimum number of galaxies in a cluster
+        ng_max = 1000 #maximu number of galaxies in a cluster
+        ngal = np.random.randint(ng_min, ng_max, nclust) #richness of the clusters (array)
+        cluster_locs = np.array([(np.random.random_sample(nclust) + 68),
+                                 (np.random.random_sample(nclust) - 48)]) #locations of
+                                                                #the centre of
+                                                                #each cluster
+                                                                #(array of
+                                                                #length
+                                                                #2nclust)
+        #add_cluster uses a normal distribution for the galaxies in the
+        #cluster, this could probably be improved
+        for i in range(0, nclust-1):
+            add_cluster((cluster_locs[0][i], cluster_locs[1][i]),
+                        (rad*ang_cluster), ngal[i])
+
+        minz = 3
+
+        found_clusters = get_clusters(galaxy_data, p, z, h, minz, linking,
+                                      'found_clusters.txt')
+
+        f_ra = [x[0] for x in found_clusters]
+        f_dec = [x[1] for x in found_clusters]
+        f_list = SkyCoord(f_ra, f_dec, frame = 'icrs', unit = 'deg')
+
+        n_ra = [x[0] for x in natural_clusters]
+        n_dec = [x[1] for x in natural_clusters]
+        n_list = SkyCoord(n_ra, n_dec, frame = 'icrs', unit = 'deg')
+
+        l_ra = [x for x in cluster_locs[0]]
+        l_dec = [x for x in cluster_locs[1]]
+        l_list = SkyCoord(l_ra, l_dec, frame = 'icrs', unit = 'deg')
+
+        n_match = 0
+        l_match = 0
+        tol = 0.05 #tolerance value for matches (degrees)
+
+        for i in range(0, len(f_list)-1):
+            n_ind, n_sep, _ = match_coordinates_sky(f_list[i], n_list,
+                                                     nthneighbor = 1)    
+            l_ind, l_sep, _ = match_coordinates_sky(f_list[i], l_list,
+                                                 nthneighbor = 1)
+
+            n_match += int(n_sep < tol*u.degree)
+            l_match += int(l_sep < tol*u.degree)
+
+        np.append(n_matches, n_match)
+        np.append(l_matches, l_match)
+
+        run += 1
+
+    nm_avg = np.mean(n_matches)
+    nm_std = np.std(n_matches)
+    lm_avg = np.mean(l_matches)
+    lm_std = np.std(l_matches)
+
+    avgs = np.array([nm_avg, nm_std, lm_avg, lm_std])
+
+    np.savetxt('avgs{}.txt'.format(rad), avgs, delimiter = ' ')
+
+    print('done')
+
+print('really done')
+>>>>>>> restructuring
 
 
 
 
+<<<<<<< HEAD
 #these control the plotting to produce handsome latex plots
 matplotlib.rcParams['lines.linewidth'] = 2
 matplotlib.rcParams['xtick.labelsize'] = 16
@@ -295,3 +389,5 @@ matplotlib.rcParams['axes.labelsize'] = 20
 matplotlib.rcParams['font.size'] = 18
 matplotlib.rcParams['text.usetex']=True
 matplotlib.rcParams['text.latex.unicode']=True
+=======
+>>>>>>> restructuring
