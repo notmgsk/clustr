@@ -94,6 +94,7 @@ for i in np.arange(sva_catalog_size//interval):
                fmt='%4.8f')
 
 clusters_fh.close()
+hdulist.close()
 
 # mpl.rc('lines', linewidth = 2)
 # plt.rcParams['font.family'] = 'Times New Roman'
