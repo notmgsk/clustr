@@ -1,4 +1,4 @@
-import numpy as np
+simport numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import astropy.coordinates as coord
@@ -251,7 +251,7 @@ natural_clusters = get_clusters(galaxy_data, p, z, h, minz, linking,
              'natural_clusters.txt')
 
 
-N = 10 #number of runs
+N = 25 #number of runs
 run = 0
 n_matches = np.empty(N)
 l_matches = np.empty(N)
@@ -278,7 +278,7 @@ while run < N:
         add_cluster((cluster_locs[0][i], cluster_locs[1][i]),
                     (rad*ang_cluster), ngal[i])
 
-    minz = 3
+    minz = 2.75
 
     found_clusters = get_clusters(galaxy_data, p, z, h, minz, linking,
                                   'found_clusters.txt')
@@ -303,7 +303,7 @@ while run < N:
 
     fc[run] = len(found_clusters)
 
-    print(str(run))
+    print('done' + str(run+1))
 
     run += 1
     

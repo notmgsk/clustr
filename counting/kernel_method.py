@@ -27,7 +27,7 @@ def gaussian_estimator(galaxy_data,p,h):
     data: raw data to be analysed
     p: number of bins to discretise the data into (2^p) bins
     h: window width (smoothing parameter)
-        
+   
     """
     
     #need to account for the fact that the bin widths won't be equal in height
@@ -191,10 +191,9 @@ def points_in_group(group, binnums):
 
 #import the data
 hdulist = fits.open("spte_sva1_red.fits")
-
 data = hdulist[1].data
-#galmask = data['MODEST_CLASS'] == 1
-#galdata = data[galmask]
+# #galmask = data['MODEST_CLASS'] == 1
+# #galdata = data[galmask]
 
 magmask = data['MAG_AUTO_R'] < 24.4
 
@@ -210,7 +209,7 @@ h = kernel_bandwidth(galaxy_data, p, z)
 
 density, xgr, ygr, xedges, yedges, bw_width, bw_height, binnums = gaussian_estimator(galaxy_data, p, h)
 
-minz = 4  #min density for cluster detection
+minz = 2.8  #min density for cluster detection
 
 clusters = find_clusters(density, minz)
 
