@@ -10,16 +10,14 @@ from astropy.io import fits
 import astropy.coordinates as coord
 import astropy.units as u
 
-def add_cluster(loc, scale, size):
-    global galaxy_data
-
+def add_cluster(galaxy_data, loc, scale, size):
     x_cluster = np.random.normal(loc[0], scale, size)
     y_cluster = np.random.normal(loc[1], scale, size)
 
     galaxy_data[0] = np.append(galaxy_data[0], x_cluster)
     galaxy_data[1] = np.append(galaxy_data[1], y_cluster)
 
-    return (loc, scale, size)
+    return galaxy_data, (loc, scale, size)
 
 def find_clusters(data, cond):
     """Returns the coordinates of overdensities (i.e. where cond is
@@ -159,8 +157,7 @@ def gaussian_estimator(galaxy_data,p,h):
                      
     binnums -= 1
     
-    return density_normed, xgr, ygr, xedges, yedges, bw_width, bw_height,
-    binnums
+    return density_normed, xgr, ygr, xedges, yedges, bw_width, bw_height, binnums
 
 def kernel_bandwidth(galaxy_data, p, z):
     """Finds the appropriate bandwidth for the kernel using the angular
@@ -192,4 +189,30 @@ def kernel_bandwidth(galaxy_data, p, z):
     #should be the number of bins that a cluster would typically
     #occupy
 
-    return h
+    return h, ang_cluster
+
+def get_clusters(galaxy_data, p, z, h, minz, linking, fname):
+    density, xgr, ygr, xedges, yedges, bw_width, bw_height, binnums = gaussian_estimator(galaxy_data, p, h)
+    clusters = find_clusters(density, minz)
+    groups = find_groups(clusters, linking)
+    groups_field = [np.array(list(map(list, (zip(xedges[group[:,0]],
+                                                 yedges[group[:,1]])))))
+                    for group in groups]
+    weights = [density[group[:,0], group[:,1]] for group in groups]
+    sigs = [np.mean(vals) for vals in weights]
+    rick = [points_in_group(group, binnums, galaxy_data) for group in groups]
+    groups_avg_pos = np.array([average_position(morty) for morty in
+    rick])
+
+    if len(groups_avg_pos) < 1:
+        RA_pos = 'nan'
+        DEC_pos = 'nan'
+        
+    else:
+        RA_pos = groups_avg_pos[:,0] - bw_width/2
+        DEC_pos = groups_avg_pos[:,1] - bw_height/2
+        np.savetxt(fname,
+               np.transpose([RA_pos, DEC_pos,sigs]), fmt = '%4.8f',
+               delimiter = ' ', header = 'RA (deg)  Dec (Deg)  Sigma')
+        
+    return np.transpose([RA_pos, DEC_pos])
