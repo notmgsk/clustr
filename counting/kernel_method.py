@@ -13,6 +13,15 @@ import abell as abell
 
 os.environ['PATH'] = os.environ['PATH'] + ':/usr/texbin'
 
+#these control the plotting to produce handsome latex plots
+matplotlib.rcParams['lines.linewidth'] = 2
+matplotlib.rcParams['xtick.labelsize'] = 16
+matplotlib.rcParams['ytick.labelsize'] = 16
+matplotlib.rcParams['axes.labelsize'] = 20
+matplotlib.rcParams['font.size'] = 18
+matplotlib.rcParams['text.usetex']=True
+matplotlib.rcParams['text.latex.unicode']=True
+
 #import the data
 hdulist = fits.open("spte_sva1_red.fits")
 data = hdulist[1].data
@@ -29,15 +38,15 @@ galaxy_data = [RA, DEC]
 p = 8 #2^p bins for Fourier transform
 z = 0.5 #redshift
 
-h = abell.kernel_bandwidth(galaxy_data, p, z)
+h, _ = abell.kernel_bandwidth(galaxy_data, p, z)
 
 density, xgr, ygr, xedges, yedges, bw_width, bw_height, binnums = abell.gaussian_estimator(galaxy_data, p, h)
 
-minz = 2.8  #min density for cluster detection
+minz = 4.5  #min density for cluster detection
 
 clusters = abell.find_clusters(density, minz)
 
-groups = abell.find_groups(clusters, 4)
+groups = abell.find_groups(clusters, 75)
 groups_field = [np.array(list(map(list, (zip(xedges[group[:,0]],
                                              yedges[group[:,1]])))))
                 for group in groups]
@@ -47,25 +56,14 @@ sigs = [np.mean(vals) for vals in weights]
 #groups_avg = np.array([average_position(group, weight) for (group, weight) in
 #                       list(map(list, zip(groups_field, weights)))])
 
-rick = [abell.points_in_group(group, binnums) for group in groups]
+rick = [abell.points_in_group(group, binnums, galaxy_data) for group in groups]
 #removing the nans by the following line means that the significances don't correspond to their physical positions
 #rick = [y for y in rick if 0 not in y.shape]
 
 groups_avg_pos = np.array([abell.average_position(morty) for morty in rick])
 
-#these control the plotting to produce handsome latex plots
-matplotlib.rcParams['lines.linewidth'] = 2
-matplotlib.rcParams['xtick.labelsize'] = 16
-matplotlib.rcParams['ytick.labelsize'] = 16
-matplotlib.rcParams['axes.labelsize'] = 20
-matplotlib.rcParams['font.size'] = 18
-matplotlib.rcParams['text.usetex']=True
-matplotlib.rcParams['text.latex.unicode']=True
-
 #plotting the actual figure
 fig = plt.figure(figsize=(12,6))
-plt.suptitle('$z = {}$, $h = {:04f}$, $\sigma >{}$'.format(z, h,
-                                                           minz))
 #defining the ratio of the two subplots - the empirical width ratios
 #just work to make the density map and scatter plot the same size
 gs=gridspec.GridSpec(1, 2, width_ratios=[1,1.067])
@@ -101,10 +99,14 @@ DEC_pos = groups_avg_pos[:,1] - bw_height/2
 #sig = np.array([density[cluster[0], cluster[1]] for cluster in
 #clusters])
 
+#remove any NaNs
+RA_pos = [x for x in RA_pos if str(x) != 'nan']
+DEC_pos = [x for x in DEC_pos if str(x) != 'nan']
+
 #save cluster locations as a text file
-np.savetxt('clusterlocs_minz{}_z{}_p{}.txt'.format(minz, z, p),
-           np.transpose([RA_pos, DEC_pos,sigs]), fmt = '%4.8f',
-           delimiter = ' ', header = 'RA (deg)  Dec (Deg)  Sigma')
+np.savetxt('data/clusterlocs_minz{}_z{}_p{}.txt'.format(minz, z, p),
+           np.transpose([RA_pos, DEC_pos]), fmt = '%4.8f',
+           delimiter = ' ')
 #save density map as a text file
 np.savetxt('kd_minz{}_z{}_p{}.txt'.format(minz, z, p), density,
            delimiter = ' ')
