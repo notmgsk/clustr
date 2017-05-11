@@ -1,10 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy.stats as stats
-from matplotlib import gridspec
-import matplotlib.patches as patches
-import matplotlib as mpl
-from matplotlib import rc
 import networkx as nx
 from astropy.io import fits
 import astropy.coordinates as coord
@@ -213,6 +208,43 @@ def get_clusters(galaxy_data, p, z, h, minz, linking, fname):
         DEC_pos = groups_avg_pos[:,1] - bw_height/2
         np.savetxt(fname,
                np.transpose([RA_pos, DEC_pos,sigs]), fmt = '%4.8f',
+               delimiter = ' ', header = 'RA (deg)  Dec (Deg)  Sigma')
+        
+    return np.transpose([RA_pos, DEC_pos])
+
+def get_clusters_cic(galaxy_data, minz, linking, N_bins, fname):
+    H, xedges, yedges, binnums = stats.binned_statistic_2d(
+        galaxy_data[0],
+        galaxy_data[1],
+        values=None,
+        statistic='count',
+        bins=N_bins,
+        expand_binnumbers=True)
+
+    sigma = np.std(H)
+    mu = np.mean(H)
+    data_normed = (H - mu)/sigma # z-values for each bin
+    clusters = find_clusters(data_normed, minz)
+    clusters_field = [[xedges[binx], yedges[biny]] for (binx, biny) in
+                      clusters]
+    groups = find_groups(clusters, minz)
+    groups_field = [np.array(list(map(list, (zip(xedges[group[:,0]],
+                                                 yedges[group[:,1]]))))) 
+                    for group in groups]
+    groups_avg_pos = np.array([
+        average_position(points_in_group(group,
+                                         binnums,
+                                         galaxy_data))
+        for group in groups])
+
+    if len(groups_avg_pos) < 1:
+        RA_pos = 'nan'
+        DEC_pos = 'nan'
+    else:
+        RA_pos = groups_avg_pos[:,0]
+        DEC_pos = groups_avg_pos[:,1]
+        np.savetxt(fname,
+               np.transpose([RA_pos, DEC_pos]), fmt = '%4.8f',
                delimiter = ' ', header = 'RA (deg)  Dec (Deg)  Sigma')
         
     return np.transpose([RA_pos, DEC_pos])
